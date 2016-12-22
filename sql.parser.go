@@ -296,8 +296,8 @@ func (sp *SQLParser) visitForm(table sqlparser.TableExpr, nodeAlias string, tabl
 			sp.result.AddTableAlias(newNodeAlias, nodeAlias)
 			newNodeAlias = nodeAlias
 		}
-		if newNodeAlias == "" && nodeAlias != "" {
-			newNodeAlias = nodeAlias
+		if newNodeAlias == "" {
+			sp.visitTable(t.Expr, nodeAlias, tableMap)
 		}
 		sp.visitTable(t.Expr, newNodeAlias, tableMap)
 	default:
@@ -331,9 +331,5 @@ func (sp *SQLParser) visitSimpleTable(table *sqlparser.TableName, alias string, 
 	dbOwner := string(table.Qualifier)
 	tableName := string(table.Name)
 	dbTable := sp.result.AddTable(dbOwner, tableName, alias)
-	if alias == "" {
-		tableMap[tableName] = dbTable
-	} else {
-		tableMap[alias] = dbTable
-	}
+	tableMap[alias] = dbTable
 }
