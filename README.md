@@ -1,110 +1,107 @@
 
 
-# 在做SQL审计的时候, 我们需要分析一条SQL访问了那些表，那些字段
+# 在做SQL审计的时候, 分析一条SQL访问了那些表，那些字段
+* 可以做敏感字段过滤
+* 可以做表权限
+* 等等.....
 
 以下是业务SQL的场景, 目前对中文支持不友好
 
-## SELECT
+## 使用方法
 ```
 p := sqlparser.NewSQLParser(`
     select
         t1.a,
         t1.b,
-        t2.e,
-        t2.f
+        t3.e ccc,
+        t3.f ddd
     from
-        table1 t1,
-        table2 t2
-    where
-        t1.a = t2.a
+        xx.table1 t1,
+        (select t2.b as e, t2.d as f from (select a as b, c as d from yy.table2) t2) t3
 `)
 r, err := p.DoParser()
 if err != nil {
     t.Error(err)
 } else {
     t.Log(r.String())
-}
-```
-```
-{
-    "*": {
-        "table1": [
-            "a",
-            "b"
-        ],
-        "table2": [
-            "e",
-            "f"
-        ]
-    }
 }
 ```
 
-## INSERT
+## 结果
 ```
-p := sqlparser.NewSQLParser(`
-    insert into table1 (a,b,c,d) values (1,2,3,4)
-`)
-r, err := p.DoParser()
-if err != nil {
-    t.Error(err)
-} else {
-    t.Log(r.String())
-}
-```
-```
+意思查询
+    表用户 xx
+        表 table1
+            表字段
+                a 无别名
+                b 无别名
+    别用户 yy
+        表 table2
+            表字段
+                a -> b -> e -> ccc (最终查询出来是ccc)
+                c -> d -> f -> ddd (最终查询出来是ddd)
 {
-    "*": {
-        "table1": [
-            "a",
-            "b",
-            "c",
-            "d"
-        ]
-    }
-}
-```
-
-## UPDATE
-```
-p := sqlparser.NewSQLParser(`
-    update table1 set a = 1, b = 2, c = 3
-`)
-r, err := p.DoParser()
-if err != nil {
-    t.Error(err)
-} else {
-    t.Log(r.String())
-}
-```
-```
-{
-    "*": {
-        "table1": [
-            "a",
-            "b",
-            "c"
-        ]
-    }
-}
-```
-
-## UPDATE
-```
-p := sqlparser.NewSQLParser(`
-    delete from table1 where a = 1
-`)
-r, err := p.DoParser()
-if err != nil {
-    t.Error(err)
-} else {
-    t.Log(r.String())
-}
-```
-```
-{
-    "*": {
-        "table1": []
+    "xx": {
+        "Name": "xx",
+        "TableMap": {
+            "table1": {
+                "Name": "table1",
+                "Alias": "t1",
+                "ColumnMap": {
+                    "a": {
+                        "Name": "a",
+                        "Alias": {
+                            "Name": "",
+                            "Alias": null
+                        }
+                    },
+                    "b": {
+                        "Name": "b",
+                        "Alias": {
+                            "Name": "",
+                            "Alias": null
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "yy": {
+        "Name": "yy",
+        "TableMap": {
+            "table2": {
+                "Name": "table2",
+                "Alias": "t3",
+                "ColumnMap": {
+                    "a": {
+                        "Name": "a",
+                        "Alias": {
+                            "Name": "b",
+                            "Alias": {
+                                "Name": "e",
+                                "Alias": {
+                                    "Name": "ccc",
+                                    "Alias": null
+                                }
+                            }
+                        }
+                    },
+                    "c": {
+                        "Name": "c",
+                        "Alias": {
+                            "Name": "d",
+                            "Alias": {
+                                "Name": "f",
+                                "Alias": {
+                                    "Name": "ddd",
+                                    "Alias": null
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 ```

@@ -14,10 +14,13 @@ import (
 func TestSelect(t *testing.T)  {
 	p := sqlparser.NewSQLParser(`
 		select
-			t2.e ccc,
-			t2.f ddd,
+			t1.a,
+			t1.b,
+			t3.e ccc,
+			t3.f ddd
 		from
-			(select a as e, b as f from table2) t2
+			xx.table1 t1,
+			(select t2.b as e, t2.d as f from (select a as b, c as d from yy.table2) t2) t3
 	`)
 	r, err := p.DoParser()
 	if err != nil {
