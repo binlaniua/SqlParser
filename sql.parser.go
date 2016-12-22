@@ -296,9 +296,7 @@ func (sp *SQLParser) visitForm(table sqlparser.TableExpr, nodeAlias string, tabl
 			sp.result.AddTableAlias(newNodeAlias, nodeAlias)
 			newNodeAlias = nodeAlias
 		}
-		if newNodeAlias == "" {
-			sp.visitTable(t.Expr, nodeAlias, tableMap)
-		}
+		sp.visitTable(t.Expr, nodeAlias, tableMap)
 		sp.visitTable(t.Expr, newNodeAlias, tableMap)
 	default:
 		kitgo.ErrorLog.Print(reflect.TypeOf(table))

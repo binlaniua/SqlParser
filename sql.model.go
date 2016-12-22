@@ -21,10 +21,11 @@ type DBUser struct {
 //
 //-------------------------------------
 type DBTable struct {
-	Name      string
-	Alias     string
-	DBUser    *DBUser `json:"-"`
-	ColumnMap map[string]*DBTableColumn
+	Name              string
+	Alias             string
+	DBUser            *DBUser `json:"-"`
+	ColumnMap         map[string]*DBTableColumn
+	allColumnAliasMap map[string]*DBTableColumnAlias
 }
 
 //-------------------------------------
@@ -34,8 +35,19 @@ type DBTable struct {
 //-------------------------------------
 type DBTableColumn struct {
 	Name    string
-	Alias   string
+	Alias   *DBTableColumnAlias
 	DBTable *DBTable `json:"-"`
+}
+
+//
+//
+// 表字段表面
+//
+//
+type DBTableColumnAlias struct {
+	Name   string
+	Column *DBTableColumn `json:"-"`
+	Alias  *DBTableColumnAlias
 }
 
 //-------------------------------------
@@ -74,7 +86,7 @@ func NewSQLparserResult() *SQLParserResult {
 //
 func (spr *SQLParserResult) AddResult(dbOwner string, table string, col string) *DBUser {
 	if IS_DEBUG {
-		kitgo.DebugLog.Printf("add => [%s] [%s] [%s]", dbOwner, table, col)
+		kitgo.DebugLog.Printf("添加 => [%s] [%s] [%s]", dbOwner, table, col)
 	}
 
 	// add db user
@@ -94,16 +106,18 @@ func (spr *SQLParserResult) AddResult(dbOwner string, table string, col string) 
 			DBUser: dbUser,
 			Name: table,
 			ColumnMap: map[string]*DBTableColumn{},
+			allColumnAliasMap: map[string]*DBTableColumnAlias{},
 		}
 		dbUser.TableMap[table] = dbTable
 	}
 
 	// add db table column
 	if col != "" {
-		dbTable.ColumnMap[col] = &DBTableColumn{
+		dbTableColumn := &DBTableColumn{
 			Name: col,
 			DBTable: dbTable,
 		}
+		dbTable.ColumnMap[col] = dbTableColumn
 	}
 	return dbUser
 }
@@ -118,7 +132,7 @@ func (spr *SQLParserResult) AddTable(dbOwner string, table string, tableAlias st
 		dbOwner = "*"
 	}
 	if IS_DEBUG {
-		kitgo.DebugLog.Printf("add table  => [%s] [%s] [%s]", dbOwner, table, tableAlias)
+		kitgo.DebugLog.Printf("添加表  => [%s] [%s] [%s]", dbOwner, table, tableAlias)
 	}
 
 	//
@@ -139,7 +153,7 @@ func (spr *SQLParserResult) AddTable(dbOwner string, table string, tableAlias st
 //
 func (spr *SQLParserResult) AddTableAlias(table string, tableAlias string) *SQLParserResult {
 	if IS_DEBUG {
-		kitgo.DebugLog.Printf("set table alias => [%s] [%s]", table, tableAlias)
+		kitgo.DebugLog.Printf("设置表别名 => [%s] [%s]", table, tableAlias)
 	}
 	if tableAlias != "" {
 		for _, dbUser := range spr.userMap {
@@ -160,17 +174,36 @@ func (spr *SQLParserResult) AddTableAlias(table string, tableAlias string) *SQLP
 //
 func (spr *SQLParserResult) AddCol(col string, colAlias string, dbTable *DBTable) {
 	if IS_DEBUG {
-		kitgo.DebugLog.Printf("add table column  => [%s] [%s]", col, colAlias, dbTable)
+		kitgo.DebugLog.Printf("添加表的列  => [%s] [%s]", col, colAlias, dbTable)
 	}
 
 	isMatch := false
 	if dbTable != nil {
 		isMatch = true
-		dbTable.ColumnMap[col] = &DBTableColumn{
-			Name: col,
-			Alias: colAlias,
-			DBTable: dbTable,
+		dbTableColumnAlias := dbTable.allColumnAliasMap[col]
+		newBbTableColumnAlias := &DBTableColumnAlias{
+			Name: colAlias,
 		}
+		if dbTableColumnAlias != nil {
+			if IS_DEBUG {
+				kitgo.DebugLog.Printf("是子查询的别名  => [%s] [%s]", col, colAlias)
+			}
+			dbTableColumnAlias.Alias = newBbTableColumnAlias
+			dbTable.allColumnAliasMap[colAlias] = newBbTableColumnAlias
+		} else {
+			if IS_DEBUG {
+				kitgo.DebugLog.Printf("不是子查询的别名  => [%s] [%s]", col, colAlias)
+			}
+			dbTableColumn := &DBTableColumn{
+				Name: col,
+				DBTable: dbTable,
+				Alias: newBbTableColumnAlias,
+			}
+			newBbTableColumnAlias.Column = dbTableColumn
+			dbTable.ColumnMap[col] = dbTableColumn
+			dbTable.allColumnAliasMap[colAlias] = newBbTableColumnAlias
+		}
+
 	}
 	if !isMatch {
 		kitgo.ErrorLog.Printf("表字段没有匹配到 => [%s] [%s]", col, colAlias)
