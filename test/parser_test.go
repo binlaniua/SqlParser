@@ -17,10 +17,13 @@ func TestSelect(t *testing.T)  {
 			t1.a aaa,
 			t1.b bbb,
 			t2.e ccc,
-			t2.f ddd
+			t2.f ddd,
+			t3.g,
+			t3.h
 		from
 			table1 t1,
-			table2 t2
+			(select a as e, b as f from table2) t2,
+			(select * from (select * from table3 t1) t4)t3
 		where
 			t1.a = t2.a
 	`)

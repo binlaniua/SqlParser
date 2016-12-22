@@ -294,7 +294,7 @@ func (sp *SQLParser) visitForm(table sqlparser.TableExpr, nodeAlias string, tabl
 			//		newNodeAlias = x
 			//	所以要把 t 映射为 x
 			sp.result.AddTableAlias(newNodeAlias, nodeAlias)
-			nodeAlias = newNodeAlias
+			newNodeAlias = nodeAlias
 		}
 		sp.visitTable(t.Expr, newNodeAlias, tableMap)
 	default:
