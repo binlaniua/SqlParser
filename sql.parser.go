@@ -67,12 +67,12 @@ func (sp *SQLParser) DoParser() (*SQLParserResult, error) {
 	//
 	case *sqlparser.Select:
 		sp.result.sqlType = SQL_TYPE_SELECT
-		sp.visitSelect(node, "")
+		sp.visitSelect(node, "", nil)
 
 	//
 	case *sqlparser.Union:
 		sp.result.sqlType = SQL_TYPE_UNION
-		sp.visitUnion(node, "")
+		sp.visitUnion(node, "", nil)
 
 	//
 	case *sqlparser.Insert:
@@ -127,9 +127,10 @@ func (sp *SQLParser) cleanSql() {
 //
 //
 func (sp *SQLParser) visitInsert(node *sqlparser.Insert) {
-	sp.visitSimpleTable(node.Table, "")
+	tableMap := map[string]*DBTable{}
+	sp.visitSimpleTable(node.Table, "", tableMap)
 	for _, column := range node.Columns {
-		sp.visitExpr(column)
+		sp.visitExpr(column, tableMap)
 	}
 }
 
@@ -139,9 +140,12 @@ func (sp *SQLParser) visitInsert(node *sqlparser.Insert) {
 //
 //
 func (sp *SQLParser) visitUpdate(node *sqlparser.Update) {
-	sp.visitSimpleTable(node.Table, "")
+	tableMap := map[string]*DBTable{}
+	sp.visitSimpleTable(node.Table, "", tableMap)
 	for _, column := range node.Exprs {
-		sp.result.AddCol(string(column.Name.Name), "", string(column.Name.Qualifier))
+		tableAlias := string(column.Name.Qualifier)
+		dbTable := tableMap[tableAlias]
+		sp.result.AddCol(string(column.Name.Name), "", dbTable)
 	}
 }
 
@@ -151,7 +155,8 @@ func (sp *SQLParser) visitUpdate(node *sqlparser.Update) {
 //
 //
 func (sp *SQLParser) visitDelete(node *sqlparser.Delete) {
-	sp.visitSimpleTable(node.Table, "")
+	tableMap := map[string]*DBTable{}
+	sp.visitSimpleTable(node.Table, "", tableMap)
 }
 
 //
@@ -159,12 +164,12 @@ func (sp *SQLParser) visitDelete(node *sqlparser.Delete) {
 // 分析查询
 //
 //
-func (sp *SQLParser) visitQuery(node sqlparser.SelectStatement, nodeAlias string) {
+func (sp *SQLParser) visitQuery(node sqlparser.SelectStatement, nodeAlias string, tableMap map[string]*DBTable) {
 	switch s := node.(type){
 	case *sqlparser.Select:
-		sp.visitSelect(s, nodeAlias)
+		sp.visitSelect(s, nodeAlias, tableMap)
 	case *sqlparser.Union:
-		sp.visitUnion(s, nodeAlias)
+		sp.visitUnion(s, nodeAlias, tableMap)
 	}
 }
 
@@ -173,9 +178,9 @@ func (sp *SQLParser) visitQuery(node sqlparser.SelectStatement, nodeAlias string
 // 分析union
 //
 //
-func (sp *SQLParser) visitUnion(node *sqlparser.Union, nodeAlias string) {
-	sp.visitQuery(node.Left, nodeAlias)
-	sp.visitQuery(node.Right, nodeAlias)
+func (sp *SQLParser) visitUnion(node *sqlparser.Union, nodeAlias string, tableMap map[string]*DBTable) {
+	sp.visitQuery(node.Left, nodeAlias, tableMap)
+	sp.visitQuery(node.Right, nodeAlias, tableMap)
 }
 
 //
@@ -183,15 +188,20 @@ func (sp *SQLParser) visitUnion(node *sqlparser.Union, nodeAlias string) {
 // 解析Select
 //
 //
-func (sp *SQLParser) visitSelect(node *sqlparser.Select, nodeAlias string) {
+func (sp *SQLParser) visitSelect(node *sqlparser.Select, nodeAlias string, tableMap map[string]*DBTable) {
+	//
+	if tableMap == nil {
+		tableMap = map[string]*DBTable{}
+	}
+
 	// 先解表
 	for _, table := range node.From {
-		sp.visitForm(table, nodeAlias)
+		sp.visitForm(table, nodeAlias, tableMap)
 	}
 
 	// 再解字段
 	for _, field := range node.SelectExprs {
-		sp.visitExpr(field)
+		sp.visitExpr(field, tableMap)
 	}
 }
 
@@ -200,18 +210,20 @@ func (sp *SQLParser) visitSelect(node *sqlparser.Select, nodeAlias string) {
 // 解析表字段
 //
 //
-func (sp *SQLParser) visitExpr(exp sqlparser.SelectExpr) {
+func (sp *SQLParser) visitExpr(exp sqlparser.SelectExpr, tableMap map[string]*DBTable) {
 	switch f := exp.(type){
 	case *sqlparser.NonStarExpr:
 		switch c := f.Expr.(type){
 		//表达式
 		case *sqlparser.ColName:
-			sp.result.AddCol(string(c.Name), string(f.As), string(c.Qualifier))
+			tableAlias := string(c.Qualifier)
+			dbTable := tableMap[tableAlias]
+			sp.result.AddCol(string(c.Name), string(f.As), dbTable)
 
 		//带函数的表达式
 		case *sqlparser.FuncExpr:
 			for _, e := range c.Exprs {
-				sp.visitExpr(e)
+				sp.visitExpr(e, tableMap)
 			}
 		//
 		case sqlparser.ValTuple:
@@ -232,7 +244,8 @@ func (sp *SQLParser) visitExpr(exp sqlparser.SelectExpr) {
 			kitgo.ErrorLog.Println(reflect.TypeOf(f.Expr))
 		}
 	case *sqlparser.StarExpr:
-		sp.result.AddCol("*", "*", string(f.TableName))
+		dbTable := tableMap[string(f.TableName)]
+		sp.result.AddCol("*", "*", dbTable)
 	}
 }
 
@@ -257,22 +270,22 @@ func (sp *SQLParser)  visitValExp(exp sqlparser.ValExpr) {
 // 分析表
 //
 //
-func (sp *SQLParser) visitForm(table sqlparser.TableExpr, nodeAlias string) {
+func (sp *SQLParser) visitForm(table sqlparser.TableExpr, nodeAlias string, tableMap map[string]*DBTable) {
 	switch t := table.(type) {
 
 	//父表
 	case *sqlparser.ParenTableExpr:
-		sp.visitForm(t.Expr, nodeAlias)
+		sp.visitForm(t.Expr, nodeAlias, tableMap)
 
 	//左右表
 	case *sqlparser.JoinTableExpr:
-		sp.visitForm(t.LeftExpr, nodeAlias)
-		sp.visitForm(t.RightExpr, nodeAlias)
+		sp.visitForm(t.LeftExpr, nodeAlias, tableMap)
+		sp.visitForm(t.RightExpr, nodeAlias, tableMap)
 
 	//真实表
 	case *sqlparser.AliasedTableExpr:
 		newNodeAlias := string(t.As)
-		if newNodeAlias != "" {
+		if newNodeAlias != "" && nodeAlias != "" {
 			//如果有表明名, 那么new就是内部的表别名
 			//例如:
 			//	select * from (select * from XX x) t
@@ -283,7 +296,7 @@ func (sp *SQLParser) visitForm(table sqlparser.TableExpr, nodeAlias string) {
 			sp.result.AddTableAlias(newNodeAlias, nodeAlias)
 			nodeAlias = newNodeAlias
 		}
-		sp.visitTable(t.Expr, nodeAlias)
+		sp.visitTable(t.Expr, newNodeAlias, tableMap)
 	default:
 		kitgo.ErrorLog.Print(reflect.TypeOf(table))
 	}
@@ -294,17 +307,15 @@ func (sp *SQLParser) visitForm(table sqlparser.TableExpr, nodeAlias string) {
 // 分析简单表
 //
 //
-func (sp *SQLParser) visitTable(table sqlparser.SimpleTableExpr, alias string) {
+func (sp *SQLParser) visitTable(table sqlparser.SimpleTableExpr, alias string, tableMap map[string]*DBTable)  {
 	switch t := table.(type){
 	//简单的表
 	case *sqlparser.TableName:
-		dbOwner := string(t.Qualifier)
-		tableName := string(t.Name)
-		sp.result.AddTable(dbOwner, tableName, alias)
+		sp.visitSimpleTable(t, alias, tableMap)
 
 	//子查询
 	case *sqlparser.Subquery:
-		sp.visitQuery(t.Select, alias)
+		sp.visitQuery(t.Select, alias, tableMap)
 	}
 }
 
@@ -313,8 +324,13 @@ func (sp *SQLParser) visitTable(table sqlparser.SimpleTableExpr, alias string) {
 //
 //
 //
-func (sp *SQLParser) visitSimpleTable(table *sqlparser.TableName, alias string) {
+func (sp *SQLParser) visitSimpleTable(table *sqlparser.TableName, alias string, tableMap map[string]*DBTable) {
 	dbOwner := string(table.Qualifier)
 	tableName := string(table.Name)
-	sp.result.AddTable(dbOwner, tableName, alias)
+	dbTable := sp.result.AddTable(dbOwner, tableName, alias)
+	if alias == "" {
+		tableMap[tableName] = dbTable
+	} else {
+		tableMap[alias] = dbTable
+	}
 }

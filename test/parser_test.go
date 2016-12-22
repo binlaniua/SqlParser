@@ -14,10 +14,10 @@ import (
 func TestSelect(t *testing.T)  {
 	p := sqlparser.NewSQLParser(`
 		select
-			t1.a,
-			t1.b,
-			t2.e,
-			t2.f
+			t1.a aaa,
+			t1.b bbb,
+			t2.e ccc,
+			t2.f ddd
 		from
 			table1 t1,
 			table2 t2
