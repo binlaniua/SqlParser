@@ -293,6 +293,7 @@ func (sp *SQLParser) visitForm(table sqlparser.TableExpr, nodeAlias string, tabl
 			//		nodeAlias = t
 			//		newNodeAlias = x
 			//	所以要把 t 映射为 x
+			// TODO: 目前没有弄好, 输出不清晰
 			sp.result.AddTableAlias(newNodeAlias, nodeAlias)
 			newNodeAlias = nodeAlias
 		}

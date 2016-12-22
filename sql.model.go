@@ -131,6 +131,8 @@ func (spr *SQLParserResult) AddTable(dbOwner string, table string, tableAlias st
 	if dbOwner == "" {
 		dbOwner = "*"
 	}
+
+	//
 	if IS_DEBUG {
 		kitgo.DebugLog.Printf("添加表  => [%s] [%s] [%s]", dbOwner, table, tableAlias)
 	}
