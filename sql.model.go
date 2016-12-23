@@ -86,14 +86,14 @@ func NewSQLparserResult() *SQLParserResult {
 //
 func (spr *SQLParserResult) AddResult(dbOwner string, table string, col string) *DBUser {
 	if IS_DEBUG {
-		kitgo.DebugLog.Printf("添加 => [%s] [%s] [%s]", dbOwner, table, col)
+		//kitgo.DebugLog.Printf("添加 => [%s] [%s] [%s]", dbOwner, table, col)
 	}
 
 	// add db user
 	dbUser, ok := spr.userMap[dbOwner]
 	if !ok {
 		dbUser = &DBUser{
-			Name: dbOwner,
+			Name:     dbOwner,
 			TableMap: map[string]*DBTable{},
 		}
 		spr.userMap[dbOwner] = dbUser
@@ -103,9 +103,9 @@ func (spr *SQLParserResult) AddResult(dbOwner string, table string, col string) 
 	dbTable, ok := dbUser.TableMap[table]
 	if !ok {
 		dbTable = &DBTable{
-			DBUser: dbUser,
-			Name: table,
-			ColumnMap: map[string]*DBTableColumn{},
+			DBUser:            dbUser,
+			Name:              table,
+			ColumnMap:         map[string]*DBTableColumn{},
 			allColumnAliasMap: map[string]*DBTableColumnAlias{},
 		}
 		dbUser.TableMap[table] = dbTable
@@ -114,7 +114,7 @@ func (spr *SQLParserResult) AddResult(dbOwner string, table string, col string) 
 	// add db table column
 	if col != "" {
 		dbTableColumn := &DBTableColumn{
-			Name: col,
+			Name:    col,
 			DBTable: dbTable,
 		}
 		dbTable.ColumnMap[col] = dbTableColumn
@@ -134,7 +134,7 @@ func (spr *SQLParserResult) AddTable(dbOwner string, table string, tableAlias st
 
 	//
 	if IS_DEBUG {
-		kitgo.DebugLog.Printf("添加表  => [%s] [%s] [%s]", dbOwner, table, tableAlias)
+		//kitgo.DebugLog.Printf("添加表  => [%s] [%s] [%s]", dbOwner, table, tableAlias)
 	}
 
 	//
@@ -175,10 +175,6 @@ func (spr *SQLParserResult) AddTableAlias(table string, tableAlias string) *SQLP
 //
 //
 func (spr *SQLParserResult) AddCol(col string, colAlias string, dbTable *DBTable) {
-	if IS_DEBUG {
-		kitgo.DebugLog.Printf("添加表的列  => [%s] [%s]", col, colAlias, dbTable)
-	}
-
 	isMatch := false
 	if dbTable != nil {
 		isMatch = true
@@ -188,18 +184,18 @@ func (spr *SQLParserResult) AddCol(col string, colAlias string, dbTable *DBTable
 		}
 		if dbTableColumnAlias != nil {
 			if IS_DEBUG {
-				kitgo.DebugLog.Printf("是子查询的别名  => [%s] [%s]", col, colAlias)
+				//kitgo.DebugLog.Printf("是子查询的别名  => [%s] [%s]", col, colAlias)
 			}
 			dbTableColumnAlias.Alias = newBbTableColumnAlias
 			dbTable.allColumnAliasMap[colAlias] = newBbTableColumnAlias
 		} else {
 			if IS_DEBUG {
-				kitgo.DebugLog.Printf("不是子查询的别名  => [%s] [%s]", col, colAlias)
+				//kitgo.DebugLog.Printf("不是子查询的别名  => [%s] [%s]", col, colAlias)
 			}
 			dbTableColumn := &DBTableColumn{
-				Name: col,
+				Name:    col,
 				DBTable: dbTable,
-				Alias: newBbTableColumnAlias,
+				Alias:   newBbTableColumnAlias,
 			}
 			newBbTableColumnAlias.Column = dbTableColumn
 			dbTable.ColumnMap[col] = dbTableColumn
