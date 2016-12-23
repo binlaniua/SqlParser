@@ -22,10 +22,40 @@ type DBUser struct {
 //-------------------------------------
 type DBTable struct {
 	Name              string
-	Alias             string
+	Alias             *DBTableAlias
 	DBUser            *DBUser `json:"-"`
 	ColumnMap         map[string]*DBTableColumn
 	allColumnAliasMap map[string]*DBTableColumnAlias
+}
+
+//
+//
+//
+//
+//
+func (dbt *DBTable) GetTopAlias() string {
+	alias := dbt.Alias
+	preAlias := alias
+	for {
+		if alias == nil {
+			return preAlias.Name
+		} else {
+			preAlias = alias
+			alias = alias.Alias
+		}
+	}
+	return ""
+}
+
+//
+//
+// 表别名
+//
+//
+type DBTableAlias struct {
+	Name  string
+	Table *DBTable `json:"-"`
+	Alias *DBTableAlias
 }
 
 //-------------------------------------
@@ -143,7 +173,10 @@ func (spr *SQLParserResult) AddTable(dbOwner string, table string, tableAlias st
 	if dbTable == nil {
 		kitgo.ErrorLog.Printf("[%s] [%s] => nil", dbOwner, table)
 	} else if tableAlias != "" {
-		dbTable.Alias = tableAlias
+		dbTable.Alias = &DBTableAlias{
+			Name:  tableAlias,
+			Table: dbTable,
+		}
 	}
 	return dbTable
 }
@@ -153,20 +186,37 @@ func (spr *SQLParserResult) AddTable(dbOwner string, table string, tableAlias st
 // 添加表别名
 //
 //
-func (spr *SQLParserResult) AddTableAlias(table string, tableAlias string) *SQLParserResult {
+func (spr *SQLParserResult) AddTableAlias(dbOwner, table string, tableAlias string) {
 	if IS_DEBUG {
-		kitgo.DebugLog.Printf("设置表别名 => [%s] [%s]", table, tableAlias)
+		kitgo.DebugLog.Printf("设置表别名 => [%s] [%s] [%s]", dbOwner, table, tableAlias)
 	}
-	if tableAlias != "" {
-		for _, dbUser := range spr.userMap {
-			for _, dbTable := range dbUser.TableMap {
-				if dbTable.Name == table {
-					dbTable.Alias = tableAlias
+	dbUser, ok := spr.userMap[dbOwner]
+	if !ok {
+		return
+	}
+	for _, dbTable := range dbUser.TableMap {
+		if dbTable.Name == table {
+			alias := dbTable.Alias
+			if alias == nil {
+				dbTable.Alias = &DBTableAlias{
+					Name:  tableAlias,
+					Table: dbTable,
+				}
+			} else {
+				for {
+					if alias.Alias != nil {
+						alias = alias.Alias
+					} else {
+						(*alias).Alias = &DBTableAlias{
+							Name:  tableAlias,
+							Table: dbTable,
+						}
+						break
+					}
 				}
 			}
 		}
 	}
-	return spr
 }
 
 //
@@ -220,12 +270,28 @@ func (spr *SQLParserResult) String() string {
 
 //
 //
-//
+// 获取用户
 //
 //
 func (spr *SQLParserResult) GetDBUser(key string) *DBUser {
 	r := spr.userMap[key]
 	return r
+}
+
+//
+//
+// 根据表别名获取表, 只能通过最外层的表别名获取
+//
+//
+func (spr *SQLParserResult) GetDBTableByAlias(alias string) *DBTable {
+	for _, dbUser := range spr.userMap {
+		for _, dbTable := range dbUser.TableMap {
+			if dbTable.GetTopAlias() == alias {
+				return dbTable
+			}
+		}
+	}
+	return nil
 }
 
 //

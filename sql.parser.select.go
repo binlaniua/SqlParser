@@ -4,7 +4,6 @@ import (
 	"github.com/binlaniua/kitgo"
 	"github.com/xwb1989/sqlparser"
 	"reflect"
-	"strings"
 )
 
 //-------------------------------------
@@ -59,31 +58,28 @@ func (ss *selectSql) doParser() error {
 //
 //
 func (ss *selectSql) visitForm(table sqlparser.TableExpr, nodeAlias string) {
-	kitgo.DebugLog.Print(strings.Repeat("=", 20))
 	switch t := table.(type) {
 
 	//父表
 	case *sqlparser.ParenTableExpr:
-		kitgo.DebugLog.Print("ParenTableExpr")
+		//kitgo.DebugLog.Print("ParenTableExpr")
 		ss.visitForm(t.Expr, nodeAlias)
 
 	//左右表
 	case *sqlparser.JoinTableExpr:
-		kitgo.DebugLog.Print("JoinTableExpr")
+		//kitgo.DebugLog.Print("JoinTableExpr")
 		ss.visitForm(t.LeftExpr, nodeAlias)
 		ss.visitForm(t.RightExpr, nodeAlias)
 
 	//真实表
 	case *sqlparser.AliasedTableExpr:
-		kitgo.DebugLog.Print("AliasedTableExpr")
+		//kitgo.DebugLog.Print("AliasedTableExpr")
 		// 加上表别名映射
 		alias := string(t.As)
 		if nodeAlias != "" {
 			ss.tableAliasMap[alias] = nodeAlias
 		}
 		ss.visitTable(t.Expr, string(t.As))
-
-		kitgo.DebugLog.Printf("[%s] => [%s]", alias, nodeAlias)
 
 	//
 	default:
@@ -100,10 +96,12 @@ func (ss *selectSql) visitTable(table sqlparser.SimpleTableExpr, alias string) {
 	switch t := table.(type) {
 	//简单的表
 	case *sqlparser.TableName:
+		//kitgo.DebugLog.Print("TableName")
 		ss.visitSimpleTable(t, alias)
 
 	//子查询
 	case *sqlparser.Subquery:
+		//kitgo.DebugLog.Print("Subquery")
 		ss.visitQuery(t.Select, alias)
 	}
 }
@@ -120,18 +118,20 @@ func (ss *selectSql) visitSimpleTable(table *sqlparser.TableName, alias string) 
 	ss.tableMap[alias] = dbTable
 
 	//反向找表别名, 把表别名指向真实表
+	ss.result.AddTableAlias(dbOwner, tableName, alias)
 	for {
 		newAlias, ok := ss.tableAliasMap[alias]
 		if ok {
+			ss.result.AddTableAlias(dbOwner, tableName, newAlias)
+			//kitgo.DebugLog.Printf("[%s] => [%s]", alias, newAlias)
 			ss.tableMap[newAlias] = dbTable
 			alias = newAlias
 		} else {
 			break
 		}
 	}
-
-	kitgo.DebugLog.Print(ss.tableAliasMap)
-	kitgo.DebugLog.Print(ss.tableMap)
+	//kitgo.DebugLog.Print(ss.tableAliasMap)
+	//kitgo.DebugLog.Print(ss.tableMap)
 }
 
 //
