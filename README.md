@@ -11,12 +11,12 @@
 ```
 p := sqlparser.NewSQLParser(`
     select
-        t1.a,
-        t1.b,
+        t1.e1,
+        t2.f1,
         t3.e ccc,
         t3.f ddd
     from
-        xx.table1 t1,
+        (select t2.b1 as e1, t2.d1 as f1 from (select a as b1, c as d1 from xx.table1) t2) t1,
         (select t2.b as e, t2.d as f from (select a as b, c as d from yy.table2) t2) t3
 `)
 r, err := p.DoParser()
@@ -33,8 +33,8 @@ if err != nil {
     表用户 xx
         表 table1
             表字段
-                a 无别名
-                b 无别名
+                a -> b1 -> e1 (最终查询出来是e1)
+                b -> d1 -> f1 (最终查询出来是f1)
     别用户 yy
         表 table2
             表字段
@@ -46,20 +46,38 @@ if err != nil {
         "TableMap": {
             "table1": {
                 "Name": "table1",
-                "Alias": "t1",
+                "Alias": {
+                    "Name": "",
+                    "Alias": {
+                        "Name": "t2",
+                        "Alias": {
+                            "Name": "t1",
+                            "Alias": null
+                        }
+                    }
+                },
                 "ColumnMap": {
                     "a": {
                         "Name": "a",
                         "Alias": {
-                            "Name": "",
-                            "Alias": null
+                            "Name": "b1",
+                            "Alias": {
+                                "Name": "e1",
+                                "Alias": {
+                                    "Name": "",
+                                    "Alias": null
+                                }
+                            }
                         }
                     },
-                    "b": {
-                        "Name": "b",
+                    "c": {
+                        "Name": "c",
                         "Alias": {
-                            "Name": "",
-                            "Alias": null
+                            "Name": "d1",
+                            "Alias": {
+                                "Name": "f1",
+                                "Alias": null
+                            }
                         }
                     }
                 }
@@ -71,7 +89,16 @@ if err != nil {
         "TableMap": {
             "table2": {
                 "Name": "table2",
-                "Alias": "t3",
+                "Alias": {
+                    "Name": "",
+                    "Alias": {
+                        "Name": "t2",
+                        "Alias": {
+                            "Name": "t3",
+                            "Alias": null
+                        }
+                    }
+                },
                 "ColumnMap": {
                     "a": {
                         "Name": "a",
@@ -97,6 +124,13 @@ if err != nil {
                                     "Alias": null
                                 }
                             }
+                        }
+                    },
+                    "f1": {
+                        "Name": "f1",
+                        "Alias": {
+                            "Name": "",
+                            "Alias": null
                         }
                     }
                 }
